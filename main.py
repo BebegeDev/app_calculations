@@ -1,5 +1,5 @@
 import time
-
+import csv
 import mqtt.contact_mqtt
 import Optimize.optimize
 import CreateJson.create_json_param_DGU
@@ -15,7 +15,6 @@ def main():
     mqttc = mqtt.contact_mqtt.connection()
     optimize = Optimize.optimize.Optimize(mqttc)
     optimize.init_optimize(param_dgu)
-    import csv
     with open('file.csv', mode='a', encoding='utf-8', newline='') as file:
         writer = csv.writer(file)
         data_to_add = ['Moment',
