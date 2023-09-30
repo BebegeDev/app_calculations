@@ -1,3 +1,6 @@
+import csv
+import json
+
 import pulp
 import pandas as pd
 import numpy as np
@@ -6,8 +9,9 @@ import numpy as np
 class Optimize:
 
     def __init__(self, mqttc):
-        self.target_w = None
-        self.cons_idx = None
+        self.excluded_engines = [-1 for _ in range(6)]
+        self.target_w = 0
+        self.cons_idx = []
         self.input_L_J = None
         self.num_engines = None
         self.engine_W = None
@@ -16,44 +20,45 @@ class Optimize:
         self.power = None
         self.mqttc = mqttc
         self.n_old = 1
+        self.flag_load = False
+        self.flag_excluded = False
 
-    def optimize(self, target_w, excluded_engines):
-        self.target_w = target_w
+    def optimize(self):
+        if self.flag_excluded and self.flag_load:
+            assignments = pulp.LpVariable.matrix(
+                name='asn', cat=pulp.LpBinary,
+                indices=(range(self.num_engines), range(self.num_points)),
+            )
+            prob = pulp.LpProblem(name='diesel_generation', sense=pulp.LpMinimize)
 
-        assignments = pulp.LpVariable.matrix(
-            name='asn', cat=pulp.LpBinary,
-            indices=(range(self.num_engines), range(self.num_points)),
-        )
-        prob = pulp.LpProblem(name='diesel_generation', sense=pulp.LpMinimize)
+            fuel_cost = pulp.LpAffineExpression()
+            for engine, engine_group in enumerate(assignments):
+                if self.excluded_engines[engine] != -1:
+                    fuel_cost += pulp.lpDot(engine_group, self.input_L_J[:, engine])
 
-        fuel_cost = pulp.LpAffineExpression()
-        for engine, engine_group in enumerate(assignments):
-            if excluded_engines[engine] != -1:
-                fuel_cost += pulp.lpDot(engine_group, self.input_L_J[:, engine])
+            prob.objective += fuel_cost
+            total_output = pulp.LpAffineExpression()
 
-        prob.objective += fuel_cost
-        total_output = pulp.LpAffineExpression()
+            for engine, engine_group in enumerate(assignments):
+                if self.excluded_engines[engine] != -1:
+                    prob.addConstraint(name=f'engine_excl_{engine}', constraint=pulp.lpSum(engine_group) <= 1)
+                    prob.objective += pulp.lpDot(engine_group, self.input_L_J[:, engine])
+                    total_output += pulp.lpDot(engine_group, self.output_W.loc[:, engine])
 
-        for engine, engine_group in enumerate(assignments):
-            if excluded_engines[engine] != -1:
-                prob.addConstraint(name=f'engine_excl_{engine}', constraint=pulp.lpSum(engine_group) <= 1)
-                prob.objective += pulp.lpDot(engine_group, self.input_L_J[:, engine])
-                total_output += pulp.lpDot(engine_group, self.output_W.loc[:, engine])
+            prob += total_output >= self.target_w - 1
+            prob += total_output <= self.target_w + 1
 
-        prob += total_output >= self.target_w - 1
-        prob += total_output <= self.target_w + 1
+            prob.solve()
+            assert prob.status == pulp.LpStatusOptimal
 
-        prob.solve()
-        assert prob.status == pulp.LpStatusOptimal
+            self.cons_idx = [
+                next((i for i, var in enumerate(engine_group) if var.value() is not None and var.value() > 0.5), None)
+                for engine_group in assignments
+            ]
 
-        self.cons_idx = [
-            next((i for i, var in enumerate(engine_group) if var.value() is not None and var.value() > 0.5), None)
-            for engine_group in assignments
-        ]
-
-        for idx, cons_idx in enumerate(self.cons_idx):
-            if cons_idx is not None:
-                print(f"Дизель {idx} включен, его мощность: {self.output_W.loc[cons_idx, idx]}")
+            for idx, cons_idx in enumerate(self.cons_idx):
+                if cons_idx is not None:
+                    print(f"Дизель {idx} включен, его мощность: {self.output_W.loc[cons_idx, idx]}")
 
     def init_optimize(self, param_dgu):
 
@@ -86,30 +91,56 @@ class Optimize:
             b_dg = b_nom / e_c
             self.input_L_J[:, engine] = (0.9 + (0.1 / (self.output_W.loc[:, engine] / N_nom))) * b_dg
 
+    def optimize_callback_load(self):
+        self.mqttc.message_callback_add("mpei/Load/load", self.get_load)
 
+    def get_load(self, client, userdata, target_w):
+        self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
+        self.flag_load = True
 
-    def optimize_callback(self):
-        list_engine = []
-        self.power = 0
-        for engine, idx in enumerate(self.cons_idx):
-            if idx is not None:
-                list_engine.append(engine)
-                self.power += self.output_W.loc[idx, engine]
-                self.mqttc.publish(f"mpei/DGU/{engine+1}/Consuming", self.input_L_J[idx, engine])
-                self.mqttc.publish(f"mpei/DGU/{engine+1}/Power/current_generator_power", self.output_W.loc[idx, engine])
-                self.mqttc.publish(f"mpei/DGU/{engine+1}/Job_status", 1)
-        for engine in range(6):
-            if engine not in list_engine:
-                self.mqttc.publish(f"mpei/DGU/{engine+1}/Power/current_generator_power", 0)
-                self.mqttc.publish(f"mpei/DGU/{engine+1}/Consuming", 0)
-                self.mqttc.publish(f"mpei/DGU/{engine+1}/Job_status", 0)
+    def optimize_callback_excluded_engines(self):
+        self.mqttc.message_callback_add("mpei/DGU/excluded_engines", self.get_excluded_engines)
 
-        d_f = ((self.power - self.n_old)/1)*0.1
-        d_N = d_f * 120 / self.n_old
-        M = round((9550 * self.power / (2200+d_N)), 2)
-        self.n_old = self.target_w
-        self.mqttc.publish(f"mpei/DGU/Moment", M)
-        self.mqttc.publish(f"mpei/DGU/Rotation_speed", 2200+d_N)
-        self.mqttc.publish(f"mpei/DGU/Changing_network_frequency", d_f)
-        self.mqttc.publish(f"mpei/DGU/Changing_network_frequency_deviation", 50+d_f)
-        self.mqttc.publish(f"mpei/DGU/Speed_deviation", d_N)
+    def get_excluded_engines(self, client, userdata, excluded_engines):
+        excluded_engines = excluded_engines.payload.decode()
+        excluded_engines = eval(excluded_engines)
+        self.excluded_engines = [int(x) for x in excluded_engines]
+        self.flag_excluded = True
+
+    def optimize_publish(self):
+        if self.flag_excluded and self.flag_load:
+            list_engine = []
+            self.power = 0
+            for engine, idx in enumerate(self.cons_idx):
+                if idx is not None:
+                    list_engine.append(engine)
+                    self.power += self.output_W.loc[idx, engine]
+                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Consuming", self.input_L_J[idx, engine])
+                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Power/current_generator_power",
+                                       self.output_W.loc[idx, engine])
+                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Job_status", 1)
+            for engine in range(6):
+                if engine not in list_engine:
+                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Power/current_generator_power", 0)
+                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Consuming", 0)
+                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Job_status", 0)
+
+            d_f = ((self.power - self.n_old) / 1) * 0.1
+            if d_f and self.n_old:
+                d_N = d_f * 120 / self.n_old
+                M = round((9550 * self.power / (2200 + d_N)), 2)
+                self.n_old = self.target_w
+                self.mqttc.publish(f"mpei/DGU/Moment", M)
+                self.mqttc.publish(f"mpei/DGU/Rotation_speed", 2200 + d_N)
+                self.mqttc.publish(f"mpei/DGU/Changing_network_frequency", d_f)
+                self.mqttc.publish(f"mpei/DGU/Changing_network_frequency_deviation", 50 + d_f)
+                self.mqttc.publish(f"mpei/DGU/Speed_deviation", d_N)
+                self.flag_excluded, self.flag_load = False, False
+                with open('file.csv', mode='a', encoding='utf-8', newline='') as file:
+                    writer = csv.writer(file)
+                    data_to_add = [M,
+                                   2200 + d_N,
+                                   d_f,
+                                   50 + d_f,
+                                   d_N]
+                    writer.writerow(data_to_add)
