@@ -6,15 +6,15 @@ Development is underway
 ### Для использования оптимизатора:
 1. Импортируйте оптимизатор
    ```
- import Optimize.optimize
+   import Optimize.optimize
    ```
 2. Создайте экземпляр класса `Optimize `
    ```
- optimize = Optimize.optimize.Optimize()
+   optimize = Optimize.optimize.Optimize()
    ```
 3. Запустите метод инициализатор, в качестве аргумента передаются параметры ДГУ (настройка параметров будет описанная позже).
    ```
- optimize.init_optimize(param_dgu)
+   optimize.init_optimize(param_dgu)
    ```
 4. Необязательный пункт. Если у вас есть подключение к mqtt вы можете использвать метод `optimize_callback_excluded_engines`, которы в качестве параметра примает объект `mqttc` (как его создать будет описано позже) и `topic` по умолчанию топик `"mpei/DGU/excluded_engines"`.
     + -2 : аварийный режим
