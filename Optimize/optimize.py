@@ -8,7 +8,8 @@ import numpy as np
 class Optimize:
 
     def __init__(self):
-        self.excluded_engines = [-1 for _ in range(6)]
+        self.data_power = None
+        self.excluded_engines = [1 for _ in range(6)]
         self.target_w = 0
         self.cons_idx = []
         self.input_L_J = None
@@ -17,13 +18,15 @@ class Optimize:
         self.num_points = None
         self.output_W = None
         self.power = None
-
+        self.list_dgu = []
         self.n_old = 1
         self.flag_excluded = False
 
 
-    def optimize(self, target_w):
-        self.target_w = target_w
+    def optimize(self, target_w=0):
+        if target_w != 0:
+            self.flag_excluded = True
+            self.target_w = target_w
         if self.flag_excluded:
             assignments = pulp.LpVariable.matrix(
                 name='asn', cat=pulp.LpBinary,
@@ -59,8 +62,11 @@ class Optimize:
             ]
 
             for idx, cons_idx in enumerate(self.cons_idx):
+
                 if cons_idx is not None:
-                    print(f"Дизель {idx} включен, его мощность: {self.output_W.loc[cons_idx, idx]}")
+                    print(f"Дизель {idx} включен, его мощность: {self.output_W.loc[cons_idx, idx]}", end=' ')
+                    print(f"его расход: {self.input_L_J[cons_idx, idx]}")
+                    self.list_dgu.append([idx, self.output_W.loc[cons_idx, idx], self.input_L_J[cons_idx, idx]])
 
     def init_optimize(self, param_dgu):
 
@@ -69,7 +75,7 @@ class Optimize:
                 'power_min': [p_min[1] for p_min in param_dgu.values()],
                 'power_max': [p_max[2] for p_max in param_dgu.values()],
             },
-            index=pd.RangeIndex(name='engine', start=0, stop=6),
+            index=pd.RangeIndex(name='engine', start=0, stop=len(param_dgu)),
         )
         self.output_W = pd.DataFrame(
             data=np.linspace(
@@ -92,15 +98,14 @@ class Optimize:
             b_dg = b_nom / e_c
             self.input_L_J[:, engine] = (0.9 + (0.1 / (self.output_W.loc[:, engine] / N_nom))) * b_dg
 
-    # def optimize_callback_load(self):
-    #     self.mqttc.message_callback_add("mpei/Load/load", self.get_load)
-    #
-    # def get_load(self, client, userdata, target_w):
-    #     self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
-    #     self.flag_load = True
+    def optimize_callback_power(self, mqttc, topic="mpei/Test/Power"):
+        mqttc.message_callback_add(topic, self.get_power)
 
-    def optimize_callback_excluded_engines(self, mqttc):
-        mqttc.message_callback_add("mpei/DGU/excluded_engines", self.get_excluded_engines)
+    def get_power(self, client, userdata, target_w):
+        self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
+
+    def optimize_callback_excluded_engines(self, mqttc, topic="mpei/DGU/excluded_engines"):
+        mqttc.message_callback_add(topic, self.get_excluded_engines)
 
     def get_excluded_engines(self, client, userdata, excluded_engines):
         excluded_engines = excluded_engines.payload.decode()
