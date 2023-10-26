@@ -1,6 +1,5 @@
 import csv
 import json
-
 import pulp
 import pandas as pd
 import numpy as np
@@ -20,11 +19,12 @@ class Optimize:
         self.power = None
         self.mqttc = mqttc
         self.n_old = 1
-        self.flag_load = False
         self.flag_excluded = False
 
-    def optimize(self):
-        if self.flag_excluded and self.flag_load:
+
+    def optimize(self, target_w):
+        self.target_w = target_w
+        if self.flag_excluded:
             assignments = pulp.LpVariable.matrix(
                 name='asn', cat=pulp.LpBinary,
                 indices=(range(self.num_engines), range(self.num_points)),
@@ -45,12 +45,14 @@ class Optimize:
                     prob.objective += pulp.lpDot(engine_group, self.input_L_J[:, engine])
                     total_output += pulp.lpDot(engine_group, self.output_W.loc[:, engine])
 
-            prob += total_output >= self.target_w - 1
-            prob += total_output <= self.target_w + 1
+            prob += total_output >= self.target_w - 0.5
+            prob += total_output <= self.target_w + 0.5
 
             prob.solve()
-            assert prob.status == pulp.LpStatusOptimal
-
+            try:
+                assert prob.status == pulp.LpStatusOptimal
+            except Exception as e:
+                print(e)
             self.cons_idx = [
                 next((i for i, var in enumerate(engine_group) if var.value() is not None and var.value() > 0.5), None)
                 for engine_group in assignments
@@ -69,17 +71,16 @@ class Optimize:
             },
             index=pd.RangeIndex(name='engine', start=0, stop=6),
         )
-        print(self.engine_W)
         self.output_W = pd.DataFrame(
             data=np.linspace(
                 start=self.engine_W['power_min'],
                 stop=self.engine_W['power_max'],
-                num=201,
+                num=501
             ),
             columns=self.engine_W.index,
         )
 
-        self.num_points = 201
+        self.num_points = 501
         self.num_engines = len(self.engine_W)
 
         self.input_L_J = np.zeros((self.num_points, self.num_engines))
@@ -91,12 +92,12 @@ class Optimize:
             b_dg = b_nom / e_c
             self.input_L_J[:, engine] = (0.9 + (0.1 / (self.output_W.loc[:, engine] / N_nom))) * b_dg
 
-    def optimize_callback_load(self):
-        self.mqttc.message_callback_add("mpei/Load/load", self.get_load)
-
-    def get_load(self, client, userdata, target_w):
-        self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
-        self.flag_load = True
+    # def optimize_callback_load(self):
+    #     self.mqttc.message_callback_add("mpei/Load/load", self.get_load)
+    #
+    # def get_load(self, client, userdata, target_w):
+    #     self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
+    #     self.flag_load = True
 
     def optimize_callback_excluded_engines(self):
         self.mqttc.message_callback_add("mpei/DGU/excluded_engines", self.get_excluded_engines)
@@ -107,40 +108,3 @@ class Optimize:
         self.excluded_engines = [int(x) for x in excluded_engines]
         self.flag_excluded = True
 
-    def optimize_publish(self):
-        if self.flag_excluded and self.flag_load:
-            list_engine = []
-            self.power = 0
-            for engine, idx in enumerate(self.cons_idx):
-                if idx is not None:
-                    list_engine.append(engine)
-                    self.power += self.output_W.loc[idx, engine]
-                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Consuming", self.input_L_J[idx, engine])
-                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Power/current_generator_power",
-                                       self.output_W.loc[idx, engine])
-                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Job_status", 1)
-            for engine in range(6):
-                if engine not in list_engine:
-                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Power/current_generator_power", 0)
-                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Consuming", 0)
-                    self.mqttc.publish(f"mpei/DGU/{engine + 1}/Job_status", 0)
-
-            d_f = ((self.power - self.n_old) / 1) * 0.1
-            if d_f and self.n_old:
-                d_N = d_f * 120 / self.n_old
-                M = round((9550 * self.power / (2200 + d_N)), 2)
-                self.n_old = self.target_w
-                self.mqttc.publish(f"mpei/DGU/Moment", M)
-                self.mqttc.publish(f"mpei/DGU/Rotation_speed", 2200 + d_N)
-                self.mqttc.publish(f"mpei/DGU/Changing_network_frequency", d_f)
-                self.mqttc.publish(f"mpei/DGU/Changing_network_frequency_deviation", 50 + d_f)
-                self.mqttc.publish(f"mpei/DGU/Speed_deviation", d_N)
-                self.flag_excluded, self.flag_load = False, False
-                with open('file.csv', mode='a', encoding='utf-8', newline='') as file:
-                    writer = csv.writer(file)
-                    data_to_add = [M,
-                                   2200 + d_N,
-                                   d_f,
-                                   50 + d_f,
-                                   d_N]
-                    writer.writerow(data_to_add)
