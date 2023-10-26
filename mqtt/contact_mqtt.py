@@ -6,11 +6,11 @@ from sys import platform
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        print("Подключение к mqtt прошло успешно")
+        print("Подключение к MQTT СЕРВЕРУ прошло успешно")
         print("------------------------------------------------------------------")
         client.subscribe('#')
     else:
-        print("Ошибка при подключении к mqtt")
+        print("Ошибка при подключении к MQTT СЕРВЕРУ")
 
 
 def connection():
