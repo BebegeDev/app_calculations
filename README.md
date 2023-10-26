@@ -4,9 +4,17 @@ Development is underway
 # Оптимизатор
 
 ### Для использования оптимизатора:
-1. Импортируйте оптимизатор
+1. Импортируйте оптимизатор и другие файлы
    ```
    import Optimize.optimize
+   from sys import platform
+   import CreateJson.create_json_param_DGU
+
+   param_dgu = ''
+   if platform == 'win32' or platform == 'win64':
+       param_dgu = CreateJson.create_json_param_DGU.open_json("\\utils\\param_dgu.json")
+   elif platform == 'linux' or platform == 'linux2':
+       param_dgu = CreateJson.create_json_param_DGU.open_json("/utils/param_dgu.json")
    ```
 2. Создайте экземпляр класса `Optimize `
    ```
