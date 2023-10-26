@@ -7,7 +7,7 @@ import numpy as np
 
 class Optimize:
 
-    def __init__(self, mqttc):
+    def __init__(self):
         self.excluded_engines = [-1 for _ in range(6)]
         self.target_w = 0
         self.cons_idx = []
@@ -17,7 +17,7 @@ class Optimize:
         self.num_points = None
         self.output_W = None
         self.power = None
-        self.mqttc = mqttc
+
         self.n_old = 1
         self.flag_excluded = False
 
@@ -99,8 +99,8 @@ class Optimize:
     #     self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
     #     self.flag_load = True
 
-    def optimize_callback_excluded_engines(self):
-        self.mqttc.message_callback_add("mpei/DGU/excluded_engines", self.get_excluded_engines)
+    def optimize_callback_excluded_engines(self, mqttc):
+        mqttc.message_callback_add("mpei/DGU/excluded_engines", self.get_excluded_engines)
 
     def get_excluded_engines(self, client, userdata, excluded_engines):
         excluded_engines = excluded_engines.payload.decode()

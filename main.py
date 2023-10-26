@@ -20,11 +20,11 @@ def main():
 
     mqttc = mqtt.contact_mqtt.connection()
 
-    freq = Frequency.frequency.Frequency(mqttc)
-    optimize = Optimize.optimize.Optimize(mqttc)
-    forecast_dgu = DGU.power_forecast.PowerForecast(mqttc)
-    forecast_ses = SES.power_farecast.PowerForecast(mqttc)
-    forecast_sne = SNE.power_forecast.PowerForecast(mqttc)
+    freq = Frequency.frequency.Frequency()
+    optimize = Optimize.optimize.Optimize()
+    forecast_dgu = DGU.power_forecast.PowerForecast()
+    forecast_ses = SES.power_farecast.PowerForecast()
+    forecast_sne = SNE.power_forecast.PowerForecast()
     optimize.init_optimize(param_dgu)
     publish = utils.publish.Publish(mqttc)
     with open('result.csv', mode='w', encoding='utf-8', newline='') as file:
@@ -37,14 +37,14 @@ def main():
                        ]
         writer.writerow(data_to_add)
     while True:
-        freq.callback_data()
-        forecast_ses.callback_data()
-        forecast_sne.callback_data()
-        forecast_dgu.callback_data()
+        freq.callback_data(mqttc)
+        forecast_ses.callback_data(mqttc)
+        forecast_sne.callback_data(mqttc)
+        forecast_dgu.callback_data(mqttc)
         freq.check_frequency()
         freq.regulation_frequency(forecast_dgu.power_forecast)
 
-        optimize.optimize_callback_excluded_engines()
+        optimize.optimize_callback_excluded_engines(mqttc)
         optimize.optimize(freq.P_DES_new)
         publish.optimize_publish(optimize)
         publish.regulation_frequency(freq)
