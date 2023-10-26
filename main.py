@@ -1,5 +1,4 @@
 import csv
-
 import mqtt.contact_mqtt
 import Optimize.optimize
 import CreateJson.create_json_param_DGU
@@ -48,7 +47,8 @@ def main():
         optimize.optimize(freq.P_DES_new)
         publish.optimize_publish(optimize)
         publish.regulation_frequency(freq)
-        print(11)
+
+
 
 if __name__ == '__main__':
     main()
