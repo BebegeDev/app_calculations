@@ -3,11 +3,13 @@ import json
 import pulp
 import pandas as pd
 import numpy as np
+from pulp import PULP_CBC_CMD
 
 
 class Optimize:
 
     def __init__(self):
+        self.flag_test_load = False
         self.data_power = None
         self.excluded_engines = [1 for _ in range(6)]
         self.target_w = 0
@@ -24,10 +26,9 @@ class Optimize:
 
 
     def optimize(self, target_w=0):
-        if target_w != 0:
-            self.flag_excluded = True
-            self.target_w = target_w
-        if self.flag_excluded:
+
+        if self.__bool_optimize(target_w):
+            print('Мощность для распределения', self.target_w)
             assignments = pulp.LpVariable.matrix(
                 name='asn', cat=pulp.LpBinary,
                 indices=(range(self.num_engines), range(self.num_points)),
@@ -51,7 +52,7 @@ class Optimize:
             prob += total_output >= self.target_w - 0.5
             prob += total_output <= self.target_w + 0.5
 
-            prob.solve()
+            prob.solve(PULP_CBC_CMD(msg=False))
             try:
                 assert prob.status == pulp.LpStatusOptimal
             except Exception as e:
@@ -67,6 +68,17 @@ class Optimize:
                     print(f"Дизель {idx} включен, его мощность: {self.output_W.loc[cons_idx, idx]}", end=' ')
                     print(f"его расход: {self.input_L_J[cons_idx, idx]}")
                     self.list_dgu.append([idx, self.output_W.loc[cons_idx, idx], self.input_L_J[cons_idx, idx]])
+            print('================================================================================')
+
+    def __bool_optimize(self, target_w):
+        if target_w != 0 and self.target_w != target_w:
+            self.target_w = target_w
+            return True
+        if self.flag_test_load and target_w == 0:
+            self.flag_test_load = False
+            return True
+
+
 
     def init_optimize(self, param_dgu):
 
@@ -81,12 +93,12 @@ class Optimize:
             data=np.linspace(
                 start=self.engine_W['power_min'],
                 stop=self.engine_W['power_max'],
-                num=501
+                num=201
             ),
             columns=self.engine_W.index,
         )
 
-        self.num_points = 501
+        self.num_points = 201
         self.num_engines = len(self.engine_W)
 
         self.input_L_J = np.zeros((self.num_points, self.num_engines))
@@ -103,13 +115,15 @@ class Optimize:
 
     def get_power(self, client, userdata, target_w):
         self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
-
+        self.flag_test_load = True
+        
     def optimize_callback_excluded_engines(self, mqttc, topic="mpei/DGU/excluded_engines"):
         mqttc.message_callback_add(topic, self.get_excluded_engines)
+
 
     def get_excluded_engines(self, client, userdata, excluded_engines):
         excluded_engines = excluded_engines.payload.decode()
         excluded_engines = eval(excluded_engines)
         self.excluded_engines = [int(x) for x in excluded_engines]
-        self.flag_excluded = True
+
 

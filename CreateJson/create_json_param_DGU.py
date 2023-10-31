@@ -26,4 +26,5 @@ def open_json(path):
         topics = json.load(json_file)
     return topics
 
+
 create_json()
