@@ -6,7 +6,7 @@ interface = Interface.interface
 
 class Frequency(interface.InterfaceForecast):
 
-    def __init__(self):
+    def __init__(self, mqttc):
         self.load = 0
         self.Freq_delta_fact_percent = None
         self.Freq_delta_fact = None
@@ -15,9 +15,10 @@ class Frequency(interface.InterfaceForecast):
         self.K_freq_base = -1.5
         self.P_DES_new = 0
         self.Delta_P = 0
+        self.mqttc = mqttc
 
-    def callback_data(self, mqttc, topic="mpei/Frequency/frequency"):
-        mqttc.message_callback_add(topic, self.get_data)
+    def callback_data(self, topic="mpei/Frequency/frequency"):
+        self.mqttc.message_callback_add(topic, self.get_data)
 
 
     def get_data(self, client, userdata, data):
