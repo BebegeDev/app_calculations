@@ -4,9 +4,9 @@ import Optimize.optimize
 import CreateJson.create_json_param_DGU
 from sys import platform
 import Frequency.frequency
-import DGU.power_forecast
-import SES.power_farecast
-import SNE.power_forecast
+import Forecast.DES.power_forecast
+import Forecast.SES.power_farecast
+import Forecast.SNE.power_forecast
 import utils.publish
 
 
@@ -21,9 +21,9 @@ def main():
 
     freq = Frequency.frequency.Frequency()
     optimize = Optimize.optimize.Optimize()
-    forecast_dgu = DGU.power_forecast.PowerForecast()
-    forecast_ses = SES.power_farecast.PowerForecast()
-    forecast_sne = SNE.power_forecast.PowerForecast()
+    forecast_dgu = Forecast.DES.power_forecast.PowerForecast()
+    forecast_ses = Forecast.SES.power_farecast.PowerForecast()
+    forecast_sne = Forecast.SNE.power_forecast.PowerForecast()
     optimize.init_optimize(param_dgu)
     publish = utils.publish.Publish(mqttc)
     with open('result.csv', mode='w', encoding='utf-8', newline='') as file:
