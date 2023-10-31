@@ -1,4 +1,6 @@
 import csv
+import time
+
 import mqtt.contact_mqtt
 import Optimize.optimize
 import CreateJson.create_json_param_DGU
@@ -35,16 +37,19 @@ def main():
                        'P_DGU'
                        ]
         writer.writerow(data_to_add)
+
     while True:
         freq.callback_data(mqttc)
         forecast_ses.callback_data(mqttc)
         forecast_sne.callback_data(mqttc)
         forecast_dgu.callback_data(mqttc)
+        optimize.optimize_callback_power(mqttc)
         freq.check_frequency()
         freq.regulation_frequency(forecast_dgu.power_forecast)
-
         optimize.optimize_callback_excluded_engines(mqttc)
         optimize.optimize(freq.P_DES_new)
+
+
         publish.optimize_publish(optimize)
         publish.regulation_frequency(freq)
 
