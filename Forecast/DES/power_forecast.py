@@ -12,7 +12,7 @@ class PowerForecast(interface.InterfaceForecast):
         self.power_forecast = 0
         self.mqttc = mqttc
 
-    def callback_data(self, topic="mpei/Forecast/Load"):
+    async def callback_data(self, topic="mpei/Forecast/Load"):
         self.mqttc.message_callback_add(topic, self.get_data)
 
     def get_data(self, client, userdata, data):

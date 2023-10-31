@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import time
 
@@ -12,7 +13,7 @@ import Forecast.SNE.power_forecast
 import utils.publish
 
 
-def main():
+async def main():
     param_dgu = ''
     if platform == 'win32' or platform == 'win64':
         param_dgu = CreateJson.create_json_param_DGU.open_json("\\utils\\param_dgu.json")
@@ -39,11 +40,12 @@ def main():
         writer.writerow(data_to_add)
 
     while True:
-        freq.callback_data()
-        forecast_ses.callback_data()
-        forecast_sne.callback_data()
-        forecast_dgu.callback_data()
-        optimize.optimize_callback_power(mqttc)
+        tasks = [freq.callback_data(), forecast_ses.callback_data(), forecast_sne.callback_data(),
+                 forecast_dgu.callback_data(), optimize.optimize_callback_power(mqttc)]
+
+        # Запускаем асинхронные функции параллельно
+        await asyncio.gather(*tasks)
+
         freq.check_frequency()
         freq.regulation_frequency(forecast_dgu.power_forecast)
         optimize.optimize_callback_excluded_engines(mqttc)
@@ -56,4 +58,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
