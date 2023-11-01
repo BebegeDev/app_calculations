@@ -110,7 +110,7 @@ class Optimize:
             b_dg = b_nom / e_c
             self.input_L_J[:, engine] = (0.9 + (0.1 / (self.output_W.loc[:, engine] / N_nom))) * b_dg
 
-    def optimize_callback_power(self, mqttc, topic="mpei/Test/Power"):
+    async def optimize_callback_power(self, mqttc, topic="mpei/Test/Power"):
         mqttc.message_callback_add(topic, self.get_power)
 
     def get_power(self, client, userdata, target_w):
