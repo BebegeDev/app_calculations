@@ -9,6 +9,8 @@ from pulp import PULP_CBC_CMD
 class Optimize:
 
     def __init__(self):
+        self.flag_get_data = None
+        self.flag_get_data_2 = None
         self.flag_test_load = False
         self.data_power = None
         self.excluded_engines = [1 for _ in range(6)]
@@ -71,11 +73,14 @@ class Optimize:
             print('================================================================================')
 
     def __bool_optimize(self, target_w):
+
         if target_w != 0 and self.target_w != target_w:
             self.target_w = target_w
+            self.flag_excluded = True
             return True
         if self.flag_test_load and target_w == 0:
             self.flag_test_load = False
+            self.flag_excluded = True
             return True
 
 
@@ -116,14 +121,17 @@ class Optimize:
     def get_power(self, client, userdata, target_w):
         self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
         self.flag_test_load = True
+        if target_w:
+            self.flag_get_data = True
         
-    def optimize_callback_excluded_engines(self, mqttc, topic="mpei/DGU/excluded_engines"):
+    async def optimize_callback_excluded_engines(self, mqttc, topic="mpei/DGU/excluded_engines"):
         mqttc.message_callback_add(topic, self.get_excluded_engines)
-
 
     def get_excluded_engines(self, client, userdata, excluded_engines):
         excluded_engines = excluded_engines.payload.decode()
         excluded_engines = eval(excluded_engines)
         self.excluded_engines = [int(x) for x in excluded_engines]
+        if excluded_engines:
+            self.flag_get_data_2 = True
 
 
