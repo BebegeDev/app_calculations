@@ -39,3 +39,4 @@ class Frequency(interface.InterfaceForecast):
             self.P_DES_new = self.load + self.Delta_P
             # self.flag_frequency = False
             print('Частота', self.frequency)
+            print('Отклонение по частоте', self.Delta_P)

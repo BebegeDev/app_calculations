@@ -19,12 +19,4 @@ def create_json():
         json.dump(param_dgu, json_file)
 
 
-def open_json(path):
-    current_script_path = os.path.abspath(__file__)
-    project_root_path = os.path.dirname(os.path.dirname(current_script_path)) + path
-    with open(project_root_path, 'r') as json_file:
-        topics = json.load(json_file)
-    return topics
-
-
 create_json()
