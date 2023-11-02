@@ -17,7 +17,7 @@ class PowerForecast(interface.InterfaceForecast):
         self.flag_power_forecast = False
         self.power_forecast = 1
         self.mqttc = mqttc
-        self.K_freq_base = -1.5
+        self.K_freq_base = -0.5
 
     async def callback_data(self, topic="mpei/Forecast/Load"):
         self.mqttc.message_callback_add(topic, self.get_data)
@@ -30,10 +30,12 @@ class PowerForecast(interface.InterfaceForecast):
 
     def regulation_load(self, power_fact):
         self.Load_delta_fact = self.power_forecast - power_fact
+        self.Load_delta_fact_percent = self.Load_delta_fact / power_fact * 100
         if self.flag_power_forecast:
-
+            K_freq = abs(self.Load_delta_fact_percent * self.K_freq_base)
+            self.Delta_P = self.Load_delta_fact_percent * -K_freq
             self.flag_power_forecast = False
             print('Факт', power_fact)
             print('Прогноз', self.power_forecast)
-            print('Отклонение факта от прогноза', self.Load_delta_fact)
+            print('Отклонение по прогнозу ', self.Delta_P)
         pass

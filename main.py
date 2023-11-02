@@ -1,26 +1,21 @@
 import asyncio
 import csv
-import time
-
-import mqtt.contact_mqtt
-import Optimize.optimize
-import CreateJson.create_json_param_DGU
 from sys import platform
-import Frequency.frequency
+import CreateJson.create_json_param_DGU
 import Forecast.DES.power_forecast
+import Forecast.Load.load
 import Forecast.SES.power_farecast
 import Forecast.SNE.power_forecast
-import Forecast.Load.load
+import Frequency.frequency
+import Optimize.optimize
+import mqtt.contact_mqtt
+import utils.create_data_file
 import utils.publish
 
 
 async def main():
-    param_dgu = ''
-    if platform == 'win32' or platform == 'win64':
-        param_dgu = CreateJson.create_json_param_DGU.open_json("\\utils\\param_dgu.json")
-    elif platform == 'linux' or platform == 'linux2':
-        param_dgu = CreateJson.create_json_param_DGU.open_json("/utils/param_dgu.json")
-
+    CreateJson.create_json_param_DGU.create_json()
+    data_path = utils.create_data_file.Util()
     mqttc = mqtt.contact_mqtt.connection()
 
     freq = Frequency.frequency.Frequency(mqttc)
@@ -29,18 +24,15 @@ async def main():
     forecast_ses = Forecast.SES.power_farecast.PowerForecast(mqttc)
     forecast_sne = Forecast.SNE.power_forecast.PowerForecast(mqttc)
     forecast_load = Forecast.Load.load.PowerForecast(mqttc)
-    optimize.init_optimize(param_dgu)
+    optimize.init_optimize(data_path.open_json("param_dgu.json"))
     publish = utils.publish.Publish(mqttc)
-
-    with open('result.csv', mode='w', encoding='utf-8', newline='') as file:
-        writer = csv.writer(file)
-        data_to_add = ['P_DES_new',
-                       'Delta_P',
-                       'frequency',
-                       'Freq_delta_fact',
-                       'P_DGU'
-                       ]
-        writer.writerow(data_to_add)
+    data_to_add = ['P_DES_new',
+                   'Delta_P',
+                   'frequency',
+                   'Freq_delta_fact',
+                   'P_DGU'
+                   ]
+    data_path.open_csv('result.csv', mode='w', name_column=data_to_add)
 
 
     tasks = [freq.callback_data(),
@@ -59,11 +51,12 @@ async def main():
                 forecast_dgu.flag_get_data and \
                 forecast_sne.flag_get_data and \
                 forecast_load.flag_get_data:
+
             freq.regulation_frequency(forecast_dgu.power_forecast)
             forecast_load.regulation_load(forecast_dgu.power_forecast)
             optimize.optimize(freq.P_DES_new)
             publish.optimize_publish(optimize)
-            publish.regulation_frequency(freq)
+            publish.regulation_frequency(freq, data_path)
             publish.regulation_load(forecast_load)
 
             freq.flag_get_data = False

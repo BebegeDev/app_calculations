@@ -1,4 +1,4 @@
-import csv
+import utils.create_data_file
 
 
 class Publish:
@@ -27,13 +27,21 @@ class Publish:
                     self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Job_status", 0)
         optimize.flag_excluded = False
 
-    def regulation_frequency(self, frequency):
+    def regulation_frequency(self, frequency, data_path):
         if frequency.flag_frequency:
             self.mqttc.publish(f"mpei/Frequency/Changing_network_frequency_deviation", frequency.Freq_delta_fact)
             self.mqttc.publish(f"mpei/DES/Power/Power_gain", frequency.Delta_P)
             self.mqttc.publish(f"mpei/DES/Power/Your_power", frequency.P_DES_new)
             self.mqttc.publish(f"mpei/DES/Power/Current_power", frequency.load)
             frequency.flag_frequency = False
+            data_to_add = [
+                frequency.P_DES_new,
+                frequency.Delta_P,
+                frequency.frequency,
+                frequency.Freq_delta_fact,
+                frequency.load
+            ]
+            data_path.open_csv('result.csv', mode='a', name_column=data_to_add)
             # with open('result.csv', mode='a', encoding='utf-8', newline='') as file:
             #     writer = csv.writer(file)
             #     data_to_add = [
@@ -44,6 +52,7 @@ class Publish:
             #         frequency.load
             #     ]
             #     writer.writerow(data_to_add)
+
 
     def regulation_load(self, forecast_load):
         if forecast_load.flag_power_forecast:
