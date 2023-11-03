@@ -37,9 +37,12 @@ async def process_data():
     while True:
         await asyncio.sleep(1)
         if all(flag.flag_get_data for flag in [freq, forecast_ses, forecast_dgu, forecast_sne, forecast_load]):
-            freq.regulation_frequency(forecast_dgu.power_forecast)
+            freq.regulation_frequency()
             forecast_load.regulation_load(forecast_dgu.power_forecast)
-            optimize.optimize(optimize_callback.excluded_engines, freq.P_DES_new)
+            optimize.optimize(optimize_callback.excluded_engines,
+                              sum([forecast_dgu.power_forecast,
+                                  freq.Delta_P,
+                                  forecast_load.Delta_P]))
             publish.optimize_publish(optimize)
             publish.regulation_frequency(freq, data_path)
             publish.regulation_load(forecast_load)
@@ -47,6 +50,6 @@ async def process_data():
         for flag in [freq, forecast_ses, forecast_dgu, forecast_sne, forecast_load, optimize_callback]:
             flag.flag_get_data = False
 
+
 if __name__ == '__main__':
     asyncio.run(process_data())
-

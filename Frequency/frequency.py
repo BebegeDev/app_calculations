@@ -36,14 +36,12 @@ class Frequency(interface.InterfaceForecast):
             self.flag_get_data = False
 
 
-    def regulation_frequency(self, load):
+    def regulation_frequency(self):
         self.Freq_delta_fact = self.frequency - 50
         self.Freq_delta_fact_percent = self.Freq_delta_fact / 50 * 100
         if self.flag_frequency:
-            self.load = load
             K_freq = abs(self.Freq_delta_fact_percent * self.K_freq_base)
             self.Delta_P = self.Freq_delta_fact_percent * -K_freq
-            self.P_DES_new = self.load + self.Delta_P
             # self.flag_frequency = False
             print('Частота', self.frequency)
             print('Отклонение по частоте', self.Delta_P)
