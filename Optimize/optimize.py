@@ -1,4 +1,3 @@
-import json
 import pulp
 import pandas as pd
 import numpy as np
@@ -8,11 +7,8 @@ from pulp import PULP_CBC_CMD
 class Optimize:
 
     def __init__(self):
-        self.flag_get_data = None
-        self.flag_get_data_2 = None
-        self.flag_test_load = False
-        self.data_power = None
-        self.excluded_engines = [1 for _ in range(6)]
+        # self.flag_test_load = False
+
         self.target_w = 0
         self.cons_idx = []
         self.input_L_J = None
@@ -20,13 +16,11 @@ class Optimize:
         self.engine_W = None
         self.num_points = None
         self.output_W = None
-        self.power = None
         self.list_dgu = []
-        self.n_old = 1
-        self.flag_excluded = False
 
 
-    def optimize(self, target_w=0):
+
+    def optimize(self, excluded_engines, target_w=0):
 
         if self.__bool_optimize(target_w):
             print('Мощность для распределения', self.target_w)
@@ -38,14 +32,14 @@ class Optimize:
 
             fuel_cost = pulp.LpAffineExpression()
             for engine, engine_group in enumerate(assignments):
-                if self.excluded_engines[engine] != -1:
+                if excluded_engines[engine] != -1:
                     fuel_cost += pulp.lpDot(engine_group, self.input_L_J[:, engine])
 
             prob.objective += fuel_cost
             total_output = pulp.LpAffineExpression()
 
             for engine, engine_group in enumerate(assignments):
-                if self.excluded_engines[engine] != -1:
+                if excluded_engines[engine] != -1:
                     prob.addConstraint(name=f'engine_excl_{engine}', constraint=pulp.lpSum(engine_group) <= 1)
                     prob.objective += pulp.lpDot(engine_group, self.input_L_J[:, engine])
                     total_output += pulp.lpDot(engine_group, self.output_W.loc[:, engine])
@@ -62,27 +56,23 @@ class Optimize:
                 next((i for i, var in enumerate(engine_group) if var.value() is not None and var.value() > 0.5), None)
                 for engine_group in assignments
             ]
-
+            self.list_dgu = []
             for idx, cons_idx in enumerate(self.cons_idx):
 
                 if cons_idx is not None:
-                    print(f"Дизель {idx} включен, его мощность: {self.output_W.loc[cons_idx, idx]}", end=' ')
+                    print(f"Дизель {idx+1} включен, его мощность: {self.output_W.loc[cons_idx, idx]}", end=' ')
                     print(f"его расход: {self.input_L_J[cons_idx, idx]}")
                     self.list_dgu.append([idx, self.output_W.loc[cons_idx, idx], self.input_L_J[cons_idx, idx]])
             print('================================================================================')
 
     def __bool_optimize(self, target_w):
-
-        if target_w != 0 and self.target_w != target_w:
+        if target_w != 0:
             self.target_w = target_w
-            self.flag_excluded = True
             return True
-        if self.flag_test_load and target_w == 0:
-            self.flag_test_load = False
-            self.flag_excluded = True
-            return True
-
-
+        # elif self.flag_test_load:
+        #     # self.flag_test_load = False
+        #     return True
+        return False
 
     def init_optimize(self, param_dgu):
 
@@ -114,23 +104,5 @@ class Optimize:
             b_dg = b_nom / e_c
             self.input_L_J[:, engine] = (0.9 + (0.1 / (self.output_W.loc[:, engine] / N_nom))) * b_dg
 
-    async def optimize_callback_power(self, mqttc, topic="mpei/Test/Power"):
-        mqttc.message_callback_add(topic, self.get_power)
-
-    def get_power(self, client, userdata, target_w):
-        self.target_w = json.loads(target_w.payload.decode("utf-8", "ignore"))
-        self.flag_test_load = True
-        if target_w:
-            self.flag_get_data = True
-        
-    async def optimize_callback_excluded_engines(self, mqttc, topic="mpei/DGU/excluded_engines"):
-        mqttc.message_callback_add(topic, self.get_excluded_engines)
-
-    def get_excluded_engines(self, client, userdata, excluded_engines):
-        excluded_engines = excluded_engines.payload.decode()
-        excluded_engines = eval(excluded_engines)
-        self.excluded_engines = [int(x) for x in excluded_engines]
-        if excluded_engines:
-            self.flag_get_data_2 = True
 
 

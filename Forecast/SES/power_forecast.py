@@ -12,7 +12,7 @@ class PowerForecast(interface.InterfaceForecast):
         self.power_forecast = 0
         self.mqttc = mqttc
 
-    async def callback_data(self, topic="mpei/Forecast/SNE"):
+    async def callback_data(self, topic="mpei/Forecast/SES"):
         self.mqttc.message_callback_add(topic, self.get_data)
 
     def get_data(self, client, userdata, data):
@@ -24,12 +24,14 @@ class PowerForecast(interface.InterfaceForecast):
                 self.flag_power_forecast = True
                 self.flag_get_data = True
             else:
-                print("Получены некорректные данные sne.")
+                print("Получены некорректные данные ses.")
         except Exception as e:
             print(f"Ошибка при обработке данных: {e}")
             self.flag_get_data = False
 
+
     def validate_data(self, data):
         if data:
             self.flag_get_data = True
+
 
