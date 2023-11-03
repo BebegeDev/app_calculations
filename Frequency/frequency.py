@@ -6,6 +6,7 @@ interface = Interface.interface
 
 class Frequency(interface.InterfaceForecast):
 
+
     def __init__(self, mqttc):
         self.flag_get_data = None
         self.load = 0
@@ -22,11 +23,17 @@ class Frequency(interface.InterfaceForecast):
         self.mqttc.message_callback_add(topic, self.get_data)
 
     def get_data(self, client, userdata, data):
-        self.frequency = json.loads(data.payload.decode("utf-8", "ignore"))
-        self.flag_frequency = True
-        if data:
-            self.flag_get_data = True
-
+        try:
+            parsed_data = json.loads(data.payload.decode("utf-8", "ignore"))
+            self.validate_data(data)
+            if self.flag_get_data:
+                self.frequency = parsed_data
+                self.flag_frequency = True
+            else:
+                print("Получены некорректные данные freq.")
+        except Exception as e:
+            print(f"Ошибка при обработке данных: {e}")
+            self.flag_get_data = False
 
 
     def regulation_frequency(self, load):
@@ -40,3 +47,7 @@ class Frequency(interface.InterfaceForecast):
             # self.flag_frequency = False
             print('Частота', self.frequency)
             print('Отклонение по частоте', self.Delta_P)
+
+    def validate_data(self, data):
+        if data:
+            self.flag_get_data = True

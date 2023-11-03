@@ -10,3 +10,7 @@ class InterfaceForecast(ABC):
     @abstractmethod
     def get_data(self, client, userdata, data):
         pass
+
+    @abstractmethod
+    def validate_data(self, data):
+        pass
