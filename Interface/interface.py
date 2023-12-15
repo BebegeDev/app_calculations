@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class InterfaceForecast(ABC):
+class InterfaceCallback(ABC):
 
     @abstractmethod
     async def callback_data(self, topic):

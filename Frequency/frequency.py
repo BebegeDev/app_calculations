@@ -1,10 +1,11 @@
 import json
-import Interface.interface
+from Interface.interface import InterfaceCallback
 
-interface = Interface.interface
+interface = InterfaceCallback
 
 
-class Frequency(interface.InterfaceForecast):
+
+class Frequency(InterfaceCallback):
 
 
     def __init__(self, mqttc):

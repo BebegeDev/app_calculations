@@ -1,6 +1,6 @@
 import asyncio
 from CreateJson.create_json_param_DGU import create_json
-from Forecast.DES.power_forecast import PowerForecast
+from Forecast.DES.power_forecast import PowerForecast as DESPowerForecast
 from Forecast.Load.load import PowerForecast as LoadPowerForecast
 from Forecast.SES.power_forecast import PowerForecast as SESPowerForecast
 from Forecast.SNE.power_forecast import PowerForecast as SNEPowerForecast
@@ -20,11 +20,11 @@ async def process_data():
     freq = Frequency(mqttc)
     optimize = Optimize()
     optimize_callback = OptimizeCallback(mqttc)
-    forecast_dgu = PowerForecast(mqttc)
+    forecast_dgu = DESPowerForecast(mqttc)
     forecast_ses = SESPowerForecast(mqttc)
     forecast_sne = SNEPowerForecast(mqttc)
     forecast_load = LoadPowerForecast(mqttc)
-    optimize.init_optimize(data_path.open_json("param_dgu.json"))
+    optimize.init_optimize(data_path.open_json("param_dgu_old.json"))
     publish = Publish(mqttc)
 
     data_to_add = ['P_DES_new', 'Delta_P', 'frequency', 'Freq_delta_fact', 'P_DGU']
@@ -35,7 +35,6 @@ async def process_data():
     await asyncio.gather(*tasks)
 
     while True:
-        await asyncio.sleep(1)
         if all(flag.flag_get_data for flag in [freq, forecast_ses, forecast_dgu, forecast_sne, forecast_load]):
             freq.regulation_frequency()
             forecast_load.regulation_load(forecast_dgu.power_forecast)
@@ -49,6 +48,7 @@ async def process_data():
 
         for flag in [freq, forecast_ses, forecast_dgu, forecast_sne, forecast_load, optimize_callback]:
             flag.flag_get_data = False
+        await asyncio.sleep(1)
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@ import csv
 import json
 import os
 from sys import platform
+import logging
 
 
 class Util:
@@ -35,11 +36,18 @@ class Util:
         except Exception as e:
             print(f"Ошибка создания {name_file}: {e}")
 
-    def open_csv(self, name_file, mode, name_column):
+    def open_csv(self, name_file, mode, data):
         current_script_path = os.path.abspath(__file__)
         path = self.__get_data_path(name_file)
         project_root_path = os.path.dirname(os.path.dirname(current_script_path)) + path
         with open(project_root_path, mode=mode, encoding='utf-8', newline='') as file:
-            writer = csv.writer(file)
-            data_to_add = name_column
+            writer = csv.writer(file, delimiter="\n")
+            data_to_add = data
             writer.writerow(data_to_add)
+
+    def create_log(self, mode):
+        current_script_path = os.path.abspath(__file__)
+        path = self.__get_data_path("py_log.log")
+        project_root_path = os.path.dirname(os.path.dirname(current_script_path)) + path
+        logging.basicConfig(level=logging.INFO, filename=project_root_path, filemode=mode,
+                            format="%(asctime)s %(levelname)s %(message)s")

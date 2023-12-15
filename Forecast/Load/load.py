@@ -1,11 +1,12 @@
 import json
 
-import Interface.interface
+from Interface.interface import InterfaceCallback
 
-interface = Interface.interface
+interface = InterfaceCallback
 
 
-class PowerForecast(interface.InterfaceForecast):
+
+class PowerForecast(InterfaceCallback):
 
     def __init__(self, mqttc):
         self.flag_get_data = None

@@ -1,10 +1,10 @@
 import json
-import Interface.interface
+from Interface.interface import InterfaceCallback
 
-interface = Interface.interface
+interface = InterfaceCallback
 
 
-class OptimizeCallback(interface.InterfaceForecast):
+class OptimizeCallback(InterfaceCallback):
 
     def __init__(self, mqttc):
         self.excluded_engines = [1 for _ in range(6)]
@@ -25,7 +25,7 @@ class OptimizeCallback(interface.InterfaceForecast):
             if self.flag_get_data:
                 self.power_forecast = parsed_data
             else:
-                print("Получены некорректные данные des.")
+                print("Получены некорректные данные.")
         except Exception as e:
             print(f"Ошибка при обработке данных: {e}")
             self.flag_get_data = False
