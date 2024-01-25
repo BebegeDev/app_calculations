@@ -2,6 +2,9 @@ import os
 import paho.mqtt.client as mqtt
 import configparser
 
+"""
+Дефолтные методы для подключения к mqtt
+"""
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:

@@ -24,7 +24,7 @@ async def process_data():
     forecast_ses = SESPowerForecast(mqttc)
     forecast_sne = SNEPowerForecast(mqttc)
     forecast_load = LoadPowerForecast(mqttc)
-    optimize.init_optimize(data_path.open_json("param_dgu_old.json"))
+    optimize.init_optimize(data_path.open_json("param_dgu.json"), 1)
     publish = Publish(mqttc)
 
     data_to_add = ['P_DES_new', 'Delta_P', 'frequency', 'Freq_delta_fact', 'P_DGU']
