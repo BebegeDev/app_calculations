@@ -1,3 +1,4 @@
+import configparser
 import csv
 import json
 import os
@@ -13,7 +14,6 @@ class Util:
             return f"{path}{name_file}"
         elif platform == 'linux' or platform == 'linux2':
             return f"/utils/{name_file}"
-
 
     def open_json(self, name_file):
         try:
@@ -51,3 +51,9 @@ class Util:
         project_root_path = os.path.dirname(os.path.dirname(current_script_path)) + path
         logging.basicConfig(level=logging.INFO, filename=project_root_path, filemode=mode,
                             format="%(asctime)s %(levelname)s %(message)s")
+
+    def config_pars(self, name):
+        config = configparser.ConfigParser()
+        project_root_path = self.get_data_path(name)
+        config.read(project_root_path)
+        return config

@@ -1,6 +1,3 @@
-import utils.create_file_and_path
-
-
 class Publish:
 
     def __init__(self, mqttc):
@@ -15,7 +12,7 @@ class Publish:
             if idx is not None:
                 list_engine.append(engine)
                 self.power += optimize.output_W.loc[idx, engine]
-                self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Consuming", optimize.input_L_J[idx, engine])
+                self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Consuming", optimize.output_L[idx, engine])
                 self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Power_DGU/current_generator_power",
                                    optimize.output_W.loc[idx, engine])
                 self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Job_status", 1)

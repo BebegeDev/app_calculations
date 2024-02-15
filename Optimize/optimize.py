@@ -1,9 +1,10 @@
+import math
+
 import pulp
 import pandas as pd
 import numpy as np
 from pulp import PULP_CBC_CMD
 import matplotlib.pyplot as plt
-import utils
 from utils.create_file_and_path import Util
 
 
@@ -21,14 +22,15 @@ class Optimize:
         self.flag_save = False
         self.target_w = 0
         self.cons_idx = []
-        self.input_L_J = None
-        self.num_engines = None
-        self.engine_W = None
+        self.output_L = None
+        self.num_engines = 2
+        self.engine_min_max = None
         self.num_points = None
         self.output_W = None
         self.list_dgu = []
 
     def optimize(self, excluded_engines, target_w=0):
+
         """
 
         Непосредственно метод оптимизации,
@@ -50,9 +52,10 @@ class Optimize:
             fuel_cost = pulp.LpAffineExpression()
             for engine, engine_group in enumerate(assignments):
                 if excluded_engines[engine] != -1:
-                    fuel_cost += pulp.lpDot(engine_group, self.input_L_J[:, engine])
+                    fuel_cost += pulp.lpDot(engine_group, self.output_L.iloc[:, engine])
             # prob.objective += fuel_cost
             # функция для создания линейной комбинации
+
             total_output = pulp.LpAffineExpression()
 
             # Цикл по двигателям для учета ограничений и добавления их к целевой функции
@@ -62,9 +65,9 @@ class Optimize:
                     # Добавление ограничения на количество выбранных двигателей
                     prob.addConstraint(name=f'engine_excl_{engine}', constraint=pulp.lpSum(engine_group) <= 1)
                     # Увеличение общей выходной мощности на мощность выбранного двигателя
-                    total_output += pulp.lpDot(engine_group, self.output_W.loc[:, engine])
+                    total_output += pulp.lpDot(engine_group, self.output_W.iloc[:, engine])
                     # Увеличение целевой функции на затраты на топливо выбранного двигателя
-                    prob.objective += pulp.lpDot(engine_group, self.input_L_J[:, engine])
+                    prob.objective += pulp.lpDot(engine_group, self.output_L.iloc[:, engine])
 
             # Добавление ограничения на общую выходную мощность
             prob += total_output == self.target_w
@@ -93,16 +96,15 @@ class Optimize:
             for idx, cons_idx in enumerate(self.cons_idx):
 
                 if cons_idx is not None:
-                    print(f"Дизель {idx} включен, его мощность: {self.output_W.loc[cons_idx, idx]}", end=' ')
-                    print(f"его расход: {self.input_L_J[cons_idx, idx]}")
-                    self.list_dgu.append([idx, self.output_W.loc[cons_idx, idx], self.input_L_J[cons_idx, idx]])
-                    b += self.input_L_J[cons_idx, idx]
-                    p += self.output_W.loc[cons_idx, idx]
+                    print(f"Дизель {idx+1} включен, его мощность: {self.output_W.iloc[cons_idx, idx]}", end=' ')
+                    print(f"его расход: {self.output_L.iloc[cons_idx, idx]}")
+                    self.list_dgu.append([idx, self.output_W.iloc[cons_idx, idx], self.output_L.iloc[cons_idx, idx]])
+                    b += self.output_L.iloc[cons_idx, idx]
+                    p += self.output_W.iloc[cons_idx, idx]
                     d += f'{idx + 1} '
             if self.flag_save:
                 column = [b, p, d]
                 Util().open_csv(self.name_file, mode='a', data=column)
-                print(1)
             print("Суммарный расход:", b)
             print('================================================================================')
 
@@ -112,62 +114,40 @@ class Optimize:
             return True
         return False
 
-    def init_optimize(self, param_dgu, k):
-        """
-        Метод init_optimize класса Optimize предназначен для инициализации данных таких как:
-            1.внесение параметров ДГУ
-            2. создание матриц мощности, расхода
-        :param param_dgu: параметры ДГУ
-        :param k: коэффициент множитель для изменения количества точек
-        """
-        # массив с ограничениями по минимальной и максимальной мощности
-        engine_data = {
-            'power_min': [p_min[1] for p_min in param_dgu.values()],
-            'power_max': [p_max[2] for p_max in param_dgu.values()],
-        }
-        # определяем количество ДГУ
-        self.num_engines = len(param_dgu)
-        # массив с минимальной и максимальной мощностью каждого ДГУ
-        self.engine_W = pd.DataFrame(engine_data, index=pd.RangeIndex(name='engine', start=0, stop=self.num_engines))
-        # Извлечение самой минимальной мощности
-        min_from_min = self.engine_W['power_min'].min()
-        # Извлечение самой максимальной мощности
-        max_from_max = self.engine_W['power_max'].max()
-        #  определение количества точек
-        self.num_points = int((max_from_max - min_from_min) / k + 1)
-        # буфер для заполнения мощностями по каждому ДГУ
-        self.output_W = pd.DataFrame(np.zeros((self.num_points, self.num_engines)), columns=self.engine_W.index)
-        self.old_W = pd.DataFrame(np.zeros((self.num_points, self.num_engines)), columns=self.engine_W.index)
-        # циклы для заполнения буфера мощностями
-        for e in range(self.num_engines):
-            c = 0
-            for p in np.linspace(min_from_min, max_from_max, num=self.num_points):
-                if self.engine_W['power_min'][e] <= p <= self.engine_W['power_max'][e]:
-                    self.output_W.loc[c, e] = p
-                    self.old_W.loc[c, e] = p
-                else:
-                    self.output_W.loc[c, e] = self.engine_W['power_min'][e]
-                    self.old_W.loc[c, e] = None
-                c += 1
-        print(len(self.output_W))
-        # буфер для заполнения расхода по каждому ДГУ
-        self.input_L_J = np.zeros((self.num_points, self.num_engines))
-        self.old_L = np.zeros((self.num_points, self.num_engines))
-        # извлечение параметров ДГУ
-        param_dgu = [p for p in param_dgu.values()]
-        # цикл для заполнения буфера расходами
-        for engine, _ in enumerate(range(self.num_engines)):
-            # номинальная мощность ДГУ
-            N_nom = param_dgu[int(engine)][2]
-            # КПД ДГУ
-            e_c = param_dgu[int(engine)][0]
-            # номинальный расход ДГУ
-            b_nom = param_dgu[int(engine)][3]
+    def init_optimize(self, connect, k):
+        if connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT * FROM power_dgu")
+            power_dgu = cursor.fetchall()
+            power_all = pd.DataFrame(power_dgu).set_index('No. of item')
+            self.output_W = self.generate_matrix(power_all)
+            self.num_points = int((power_all.max(axis=1).iloc[-1] - power_all.min(axis=1).iloc[0]) / k)
+            cursor = connect.cursor()
+            cursor.execute("SELECT * FROM consumption_dgu")
+            power_dgu = cursor.fetchall()
+            consumption_all = pd.DataFrame(power_dgu).set_index('No. of item')
+            self.output_L = self.generate_matrix(consumption_all)
 
-            b_dg = b_nom / e_c
-            # формула для расчета расхода ДГУ
-            self.input_L_J[:, engine] = (0.9 + (0.1 / (self.output_W.loc[:, engine] / N_nom))) * b_dg
-            self.old_L[:, engine] = (0.9 + (0.1 / (self.old_W.loc[:, engine] / N_nom))) * b_dg
+
+
+    @staticmethod
+    def generate_matrix(data):
+        output = {}
+        for c, r in data.items():
+            output[c] = []
+            for c_1, r_1 in r.items():
+
+                try:
+                    if r_1 is None or math.isnan(r_1):
+                        output[c].append(data[c].min(axis=0))
+                        pass
+                    else:
+                        output[c].append(r_1)
+                except Exception as e:
+                    print(e)
+
+        output = pd.DataFrame(output)
+        return output
 
     def save_optimize(self, name_file, column):
         self.name_file = f'{name_file}.csv'
@@ -193,9 +173,9 @@ class Optimize:
 
         for idx, cons_idx in enumerate(self.cons_idx):
             if cons_idx is not None:
-                plt.scatter(self.output_W.loc[cons_idx, idx], self.input_L_J[cons_idx, idx],
+                plt.scatter(self.output_W.loc[cons_idx, idx], self.output_L[cons_idx, idx],
                             marker=marker[idx], label=f'ДГУ {idx + 1}: '
-                                                      f'b={round(self.input_L_J[cons_idx, idx], 2)}, '
+                                                      f'b={round(self.output_L[cons_idx, idx], 2)}, '
                                                       f'p={self.output_W.loc[cons_idx, idx]}', s=100)
         plt.legend(fontsize=8)
         plt.xlabel('Мощность [кВт]')

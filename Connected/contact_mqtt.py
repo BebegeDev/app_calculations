@@ -1,9 +1,8 @@
-import os
 import paho.mqtt.client as mqtt
 import configparser
 
 """
-Дефолтные методы для подключения к mqtt
+Дефолтные методы для подключения к Connected
 """
 
 def on_connect(client, userdata, flags, rc):

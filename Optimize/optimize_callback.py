@@ -1,4 +1,3 @@
-import json
 from Interface.interface import InterfaceCallback
 
 interface = InterfaceCallback
@@ -23,7 +22,7 @@ class OptimizeCallback(InterfaceCallback):
     def get_data(self, client, userdata, data):
         """
 
-        :param client: клиент mqtt
+        :param client: клиент Connected
         :param userdata: дата от клиента
         :param data: полезная нагрузка
         """
