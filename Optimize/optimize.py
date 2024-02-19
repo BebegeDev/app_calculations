@@ -1,8 +1,9 @@
 import math
+import time
+from datetime import datetime
 
 import pulp
 import pandas as pd
-import numpy as np
 from pulp import PULP_CBC_CMD
 import matplotlib.pyplot as plt
 from utils.create_file_and_path import Util
@@ -18,12 +19,15 @@ class Optimize:
 
         # self.flag_test_load = False
 
+        self.excluded_engines = None
+        self.consumption_all = None
+        self.power_all = None
         self.name_file = None
         self.flag_save = False
         self.target_w = 0
         self.cons_idx = []
         self.output_L = None
-        self.num_engines = 2
+        self.num_engines = 6
         self.engine_min_max = None
         self.num_points = None
         self.output_W = None
@@ -39,7 +43,7 @@ class Optimize:
         """
         # ограничение для проверки ручного и автоматического ввода мощности (необязательное)
         if self.__bool_optimize(target_w):
-
+            self.excluded_engines = excluded_engines
             # вывод в консоль целевую мощность
             print('Мощность для распределения', self.target_w)
             # создание матрицы переменных решения
@@ -103,7 +107,7 @@ class Optimize:
                     p += self.output_W.iloc[cons_idx, idx]
                     d += f'{idx + 1} '
             if self.flag_save:
-                column = [b, p, d]
+                column = [b, p, d, datetime.now()]
                 Util().open_csv(self.name_file, mode='a', data=column)
             print("Суммарный расход:", b)
             print('================================================================================')
@@ -119,16 +123,14 @@ class Optimize:
             cursor = connect.cursor()
             cursor.execute("SELECT * FROM power_dgu")
             power_dgu = cursor.fetchall()
-            power_all = pd.DataFrame(power_dgu).set_index('No. of item')
-            self.output_W = self.generate_matrix(power_all)
-            self.num_points = int((power_all.max(axis=1).iloc[-1] - power_all.min(axis=1).iloc[0]) / k)
+            self.power_all = pd.DataFrame(power_dgu).set_index('No. of item')
+            self.output_W = self.generate_matrix(self.power_all)
+            self.num_points = int((self.power_all.max(axis=1).iloc[-1] - self.power_all.min(axis=1).iloc[0]) / k)
             cursor = connect.cursor()
             cursor.execute("SELECT * FROM consumption_dgu")
             power_dgu = cursor.fetchall()
-            consumption_all = pd.DataFrame(power_dgu).set_index('No. of item')
-            self.output_L = self.generate_matrix(consumption_all)
-
-
+            self.consumption_all = pd.DataFrame(power_dgu).set_index('No. of item')
+            self.output_L = self.generate_matrix(self.consumption_all)
 
     @staticmethod
     def generate_matrix(data):
@@ -152,35 +154,35 @@ class Optimize:
     def save_optimize(self, name_file, column):
         self.name_file = f'{name_file}.csv'
         self.flag_save = True
-        Util().open_csv(self.name_file, mode='a', data=column)
+        Util().open_csv(self.name_file, mode='w', data=column)
 
     def build_and_save_graph(self, filename):
-        self.old_L = pd.DataFrame(self.old_L)
-        self.old_W = pd.DataFrame(self.old_W)
 
-        linestyles = ['-', '--', '-.', ':', '--', '--']
+        lines_styles = ['-', '--', '-.', ':', '--', '--']
         color = ['black', 'red', 'black', 'red', 'black', 'red']
         marker = ['^', 'v', '^', 'v', '^', 'v']
 
-        for i, linestyle in enumerate(linestyles):
+        for i, e in enumerate(self.excluded_engines):
+            print(i, e)
+            if e >= 1:
+                plt.plot(self.power_all.iloc[:, i], self.consumption_all.iloc[:, i],
+                         linestyle=lines_styles[i],
+                         label=f'Характеристика ДГУ {i + 1}',
+                         color=color[i], linewidth=1)
 
-            if i % 2 == 0:
-                plt.plot(self.old_W[i], self.old_L[i] * 1.005, linestyle=linestyle, label=f'Характеристика ДГУ {i + 1}',
-                         color=color[i], linewidth=1)
-            else:
-                plt.plot(self.old_W[i], self.old_L[i], linestyle=linestyle, label=f'Характеристика ДГУ {i + 1}',
-                         color=color[i], linewidth=1)
 
         for idx, cons_idx in enumerate(self.cons_idx):
             if cons_idx is not None:
-                plt.scatter(self.output_W.loc[cons_idx, idx], self.output_L[cons_idx, idx],
+                plt.scatter(self.output_W.iloc[cons_idx, idx], self.output_L.iloc[cons_idx, idx],
                             marker=marker[idx], label=f'ДГУ {idx + 1}: '
-                                                      f'b={round(self.output_L[cons_idx, idx], 2)}, '
-                                                      f'p={self.output_W.loc[cons_idx, idx]}', s=100)
+                                                      f'b={round(self.output_L.iloc[cons_idx, idx], 2)}, '
+                                                      f'p={self.output_W.iloc[cons_idx, idx]}', s=100)
+
         plt.legend(fontsize=8)
         plt.xlabel('Мощность [кВт]')
-        plt.ylim(225, 400)
+        # # plt.ylim(225, 400)
         plt.ylabel('Удельный расход [г/кВт*ч]')
         plt.grid()
         plt.savefig(f'{filename}_{self.target_w}.png')
         # plt.show()
+        plt.close()

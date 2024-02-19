@@ -4,39 +4,45 @@ Development is underway
 # Оптимизатор
 
 ### Для использования оптимизатора (можете опираться на `test.py`):
-1. Импортируйте оптимизатор и другие файлы
+1. Импортируйте модули
    ```
-   import Optimize.optimize
-   from sys import platform
-   import CreateJson.create_json_param_DGU
-
-   param_dgu = ''
-   if platform == 'win32' or platform == 'win64':
-       param_dgu = CreateJson.create_json_param_DGU.open_json("\\utils\\param_dgu.json")
-   elif platform == 'linux' or platform == 'linux2':
-       param_dgu = CreateJson.create_json_param_DGU.open_json("/utils/param_dgu.json")
+   from Connected.connection_db import add_user
+   from Optimize.optimize import Optimize
+   from utils.create_file_and_path import Util
    ```
-2. Создайте экземпляр класса `Optimize `
+2. Создайте экземпляр класса `Optimize и Util`, а также создайте подключение к БД
    ```
-   optimize = Optimize.optimize.Optimize()
+   data_path = Util()
+   test = Optimize()
+   connect = add_user()
    ```
-3. Запустите метод инициализатор, в качестве аргумента передаются параметры ДГУ (настройка параметров будет описанная позже).
+3. Запустите метод инициализатор, в качестве аргумента передаются подключение к БД и шаг мощности.
    ```
-   optimize.init_optimize(param_dgu)
+   test.init_optimize(connect, 0.5)
    ```
-4. Необязательный пункт. Если у вас есть подключение к mqtt вы можете использвать метод `optimize_callback_excluded_engines`, которы в качестве параметра примает объект `mqttc` (как его создать будет описано позже) и `topic` по умолчанию топик `"mpei/DGU/excluded_engines"`.
+4. Необязательный пункт. Если у вас есть подключение к mqtt вы можете использовать метод `optimize_callback_excluded_engines`, которы в качестве параметра принимает объект `mqttc` (как его создать будет описано позже) и `topic` по умолчанию топик `"mpei/DGU/excluded_engines"`.
     + -2 : аварийный режим
     * -1 : выключен
     * 0 : холостой ход
     * 1 : в работе
-5. Необязательный пункт. Если у вас есть подключение к mqtt вы можете использвать метод `optimize_callback_power`, которы в качестве параметра примает объект `mqttc` (как его создать будет описано позже) и `topic` по умолчанию топик `"mpei/Test/Power"`.
-6. Запустите метод `optimize.optimize` в качестве аргумента принимает мощность для оптимизации, если у вас выполнен пункт №5, то можно ничего не передавать.
+5. Необязательный пункт. Если у вас есть подключение к mqtt вы можете использовать метод `optimize_callback_power`, которы в качестве параметра принимает объект `mqttc` и `topic` по умолчанию топик `"mpei/Test/Power"`.
+6. Вы можете также использовать метод для сохранения результата программы в файл формата .csv. name - имя файла, column - столбцы.
 ```
-optimize.optimize()
+column = ['b', 'p', 'dgu', 'time']
+test.save_optimize(name, column)
 ```
-
+7. Запустите метод `optimize` в качестве аргумента принимает кол-во доступных ДГУ и мощность для оптимизации.
+```
+test.optimize([1, 1, -1, -1, -1, -1], 37)
+```
+8. Дополнительно можете использовать метод `test.build_and_save_graph` он предназначен для сохранения графиков.
+```commandline
+    test.build_and_save_graph(data_path.get_data_path('graph',
+                                                      'C://Users//Александр//app_calculations//images//graph_dgu//'))
+```
 ### Для настройки параметров ДГУ
-Откройте файл и отредоктируйте файл `utils\param_dgu.json` (для лучшего отображения нажмите `cntrl + alt + L`).
+ВРЕМЕННО НЕ ФУНКЦИОНИРУЕТ (пока работает только из БД)
+Откройте файл и отредактируйте файл `utils\param_dgu.json` (для лучшего отображения нажмите `cntrl + alt + L`).
 
 ### Для настройки mqttc
 1. Откройте файл и отредактируйте `utils\setting/ini`.
