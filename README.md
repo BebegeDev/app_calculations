@@ -4,7 +4,7 @@ Development is underway
 # Оптимизатор
 
 ### Для использования оптимизатора (можете опираться на `test.py`):
-1. Импортируйте модули
+1. Импортируйте модули.
    ```
    from Connected.connection_db import add_user
    from Optimize.optimize import Optimize
