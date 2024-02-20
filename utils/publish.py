@@ -11,10 +11,10 @@ class Publish:
         for engine, idx in enumerate(optimize.cons_idx):
             if idx is not None:
                 list_engine.append(engine)
-                self.power += optimize.output_W.loc[idx, engine]
-                self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Consuming", optimize.output_L[idx, engine])
+                self.power += optimize.output_W.iloc[idx, engine]
+                self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Consuming", optimize.output_L.iloc[idx, engine])
                 self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Power_DGU/current_generator_power",
-                                   optimize.output_W.loc[idx, engine])
+                                   optimize.output_W.iloc[idx, engine])
                 self.mqttc.publish(f"mpei/DES/DGU/{engine + 1}/Job_status", 1)
         for engine in range(6):
             if engine not in list_engine:

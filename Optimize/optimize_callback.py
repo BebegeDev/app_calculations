@@ -33,6 +33,7 @@ class OptimizeCallback(InterfaceCallback):
             self.validate_data(data)
             if self.flag_get_data:
                 self.power_forecast = parsed_data
+                print("Доступные дизели:", self.excluded_engines)
             else:
                 print("Получены некорректные данные.")
         except Exception as e:

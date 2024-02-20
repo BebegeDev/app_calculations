@@ -12,6 +12,7 @@ from Connected.contact_mqtt import connection
 from utils.create_file_and_path import Util
 from utils.publish import Publish
 from Connected.connection_db import add_user
+from CommandOperator.command_operator import Command
 
 
 async def process_data():
@@ -19,8 +20,6 @@ async def process_data():
     create_json()
     # Создание экземпляра класса Util для возможности читать и сохранять данные в файлах разного расширения.
     data_path = Util()
-    # Вызов функции для подключения к MQTT и проверки подключения
-    mqttc = connection()
     connect = add_user()
     # Создание экземпляра класса Frecency для вызова метода с приемом, передачей и расчетом отклонения частоты.
     freq = Frequency(mqttc)
@@ -34,7 +33,7 @@ async def process_data():
     forecast_sne = SNEPowerForecast(mqttc)
     forecast_load = LoadPowerForecast(mqttc)
     # Вызов метода init_optimize() для формирования ресурсов в работе оптимизации.
-    optimize.init_optimize(connect)
+    optimize.init_optimize(connect, 0.5)
     # Создание экземпляра класса Publish(mqttc) для возможности публиковать данные.
     publish = Publish(mqttc)
 
@@ -47,26 +46,34 @@ async def process_data():
     # цикл для обработки событий
     while True:
         # проверка на наличие спрогнозированной мощности ДЭС и частоты
-        if all(flag.flag_get_data for flag in [freq, forecast_dgu]):
-            # метод регулирования частоты
-            freq.regulation_frequency()
-            # метод регулирования мощности ДЭС
-            forecast_load.regulation_load(forecast_dgu.power_forecast)
-            # запуск оптимизации по новой целевой мощности
-            optimize.optimize(optimize_callback.excluded_engines, 1000)
-            # публикация результатов оптимизации
-            publish.optimize_publish(optimize)
-            # публикация результатов новой частоты
-            publish.regulation_frequency(freq, data_path)
-            # публикация результатов новой нагрузки
-            publish.regulation_load(forecast_load)
-        # возврат флагов в изначальное состояние
-        for flag in [freq, forecast_dgu, optimize_callback]:
-            flag.flag_get_data = False
-        # задержка в 1 секунду
-        await asyncio.sleep(1)
+        if command_operator.parsed_data:
+            if all(flag.flag_get_data for flag in [freq, forecast_dgu]):
+                # метод регулирования частоты
+                freq.regulation_frequency()
+                # метод регулирования мощности ДЭС
+                forecast_load.regulation_load(forecast_dgu.power_forecast)
+                # запуск оптимизации по новой целевой мощности
+                optimize.optimize(optimize_callback.excluded_engines, 20)
+                # публикация результатов оптимизации
+                publish.optimize_publish(optimize)
+                # публикация результатов новой частоты
+                publish.regulation_frequency(freq, data_path)
+                # публикация результатов новой нагрузки
+                publish.regulation_load(forecast_load)
+            # возврат флагов в изначальное состояние
+            for flag in [freq, forecast_dgu, optimize_callback]:
+                flag.flag_get_data = False
+            # задержка в 1 секунду
+            await asyncio.sleep(1)
 
 
 if __name__ == '__main__':
-    # запуск главной функции
-    asyncio.run(process_data())
+    # Вызов функции для подключения к MQTT и проверки подключения
+    mqttc = connection()
+    command_operator = Command(mqttc)
+    command_operator.callback_data()
+    while True:
+        if command_operator.parsed_data:
+            asyncio.run(process_data())
+
+            break
