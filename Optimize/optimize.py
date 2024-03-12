@@ -1,5 +1,4 @@
 import math
-import time
 from datetime import datetime
 
 import pulp
@@ -100,7 +99,7 @@ class Optimize:
             for idx, cons_idx in enumerate(self.cons_idx):
 
                 if cons_idx is not None:
-                    print(f"Дизель {idx+1} включен, его мощность: {self.output_W.iloc[cons_idx, idx]}", end=' ')
+                    print(f"Дизель {idx + 1} включен, его мощность: {self.output_W.iloc[cons_idx, idx]}", end=' ')
                     print(f"его расход: {self.output_L.iloc[cons_idx, idx]}")
                     self.list_dgu.append([idx, self.output_W.iloc[cons_idx, idx], self.output_L.iloc[cons_idx, idx]])
                     b += self.output_L.iloc[cons_idx, idx]
@@ -169,7 +168,6 @@ class Optimize:
                          linestyle=lines_styles[i],
                          label=f'Характеристика ДГУ {i + 1}',
                          color=color[i], linewidth=1)
-
 
         for idx, cons_idx in enumerate(self.cons_idx):
             if cons_idx is not None:
